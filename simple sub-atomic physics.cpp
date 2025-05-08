@@ -7,21 +7,33 @@
 #include<glut.h>  
 #include<glu.h>
 #include<math.h> 
+#include<imgui.h>
 #define RADIATION 3.14/180 
 #define STB_IMAGE_IMPLEMENTATION
-#include"stb_image.h"
+#include"stb_image.h"   
+
+#include<al.h>
+#include<alc.h>   
+#define DR_WAV_IMPLEMENTATION
+#include"dr_wav.h"  
+
 float x, y, z; 
 float Yrotation, Xrotation;  
-float physX, physY, physZ; 
+float physX, physY, physZ=-50; 
 float physangle;
 float itemangle = 0; float clockangle2; float pendulumnANGLE; 
+bool velocimaybe; 
+bool startscaling;
+float ballrotation; 
+float ballsize=0.5;
 int col1 = 1, col2 = 1, col3 = 1;
 GLuint floorTex;
 GLuint itemTex;
 GLuint ceilingTex; 
 GLuint walltex1; 
 GLuint sprite1; 
-GLuint sprite2;
+GLuint sprite2; 
+GLuint sprite3;
 struct Motion
 {
     bool Forward, Backward, Left, Right, upward, down;
@@ -94,6 +106,19 @@ void Item()
     
 } 
 
+void conveyor()
+{
+    glPushMatrix();
+    
+    glTranslatef(-100, -1.5, 20); 
+    glRotatef(90, 0, 0, 1);
+    glColor3f(1, 0, 1);
+    glScalef(1, 25, 1);
+    glutWireCube(1);
+
+    glPopMatrix();
+}
+
 void machine1(float angle)
 {
     glPushMatrix();   
@@ -121,11 +146,21 @@ void testOBJ()
     glPopMatrix();
 }
 
+void scaleball()
+{
+    glPushMatrix();
+    glColor3f(1, 1, 1);
+    glTranslatef(0.5f, -0.5, -1);
+    glScalef(ballsize, ballsize, ballsize - ballsize/2);
+    glutWireSphere(1, 100, 100);
+
+    glPopMatrix();
+}
 
 void player() 
 {   
     Item(); 
-
+  //  scaleball();
     float nextX = x; 
     float nextY = y;  
     float nextZ = z;
@@ -159,7 +194,7 @@ void player()
     {
         std::cout << "you got teleporter\n";
         teleportpickup = true; 
-        
+        startscaling = true;
     } 
 
     if (!yescollision(x, z, y, 3, 5, -1, 1, -8, -6))
@@ -172,12 +207,17 @@ void player()
     {
         std::cout << "wall is here\n"; 
         teleportpickup = false; 
-       
+        startscaling = false;
     } 
     if (!yescollision(x, z, y, -9, -7, -1, 1, -14, -12))
     {
         x = nextX;
         z = nextZ;
+    } 
+
+    if (yescollision(x, z, y, 21, 24, -3, 1, 67, 72))
+    {
+        std::cout << "I'm easy for others to forget and ignore, like you\n";
     }
 
 
@@ -189,16 +229,16 @@ void player()
   
 }
 
-void wall()
+void wall(float wallx,float wally,float wallz)
 {
     glPushMatrix(); 
-    glTranslatef(-8,  0, -13);
+    glTranslatef(wallx,  wally, wallz);
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, walltex1); 
 
    
     glColor3f(1, 1, 1);
-     glScalef(5,5,1);
+     glScalef(10,12,1);
 
     glBegin(GL_POLYGON);
 
@@ -220,8 +260,9 @@ void floor(int Y,GLuint texture)
 
     glEnable(GL_TEXTURE_2D); 
     glBindTexture(GL_TEXTURE_2D,texture);
-    glColor3f(1, 1, 1); 
-    glTranslatef(0,Y, 0);
+    glColor3f(1, 1, 1);  
+    glTranslatef(0,Y, 0); 
+    glScalef(1, 1, 3);
     glBegin(GL_QUADS);
     glTexCoord2f(0,0); glVertex3f(-50.0, -5.0, -50.0);
     glTexCoord2f(1,0); glVertex3f(50.0, -5.0, -50.0);
@@ -234,16 +275,16 @@ void floor(int Y,GLuint texture)
     glPopMatrix();
 }
 
-void sprite(GLuint texture)
+void sprite(GLuint texture,float sx, float sy, float sz)
 {
     glPushMatrix();
-    glTranslatef(10, -2, 14);
+    glTranslatef(sx, sy, sz);
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, texture);
 
     glRotatef(Xrotation,0,1,0);
     glColor3f(1, 1, 1);
-    glScalef(2, 5, 7);
+    glScalef(2, 7, 7);
 
     glBegin(GL_POLYGON);
 
@@ -262,7 +303,7 @@ void sprite(GLuint texture)
 void mechanicalCLOCK()
 {
     glPushMatrix();
-    glTranslatef(-100, 0, 0);
+    glTranslatef(20, -1, -80);
     glRotatef(90, 0, 1, 0);
     glPushMatrix(); 
  
@@ -290,7 +331,8 @@ void physicsBALL()
     glPushMatrix(); 
     glColor3f(0, 0, 1); 
     glTranslatef(physX,physY,physZ); 
-    glRotatef(physangle, 1, 0, 0);
+    glRotatef(physangle, 1, 0, 0); 
+   
     glutWireSphere(4,100,100);
   
     glPopMatrix();
@@ -306,23 +348,28 @@ void launcher()
     glPopMatrix();
 }
 
+
+
 void displaying()
 {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
-    glLoadIdentity();    
-
-    
-    player(); 
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);   
+    glLoadIdentity();      
+   
+    player();   
    
     floor(0,floorTex);   
-
+    conveyor();
     floor(13,ceilingTex); 
     launcher();
      testOBJ();
-     wall(); 
-     physicsBALL();
+     wall(-8,-5,-13);  
+     wall(10,-5,-100);
+     physicsBALL(); 
+     
      mechanicalCLOCK(); 
-     sprite(sprite1);
+     sprite(sprite1,10,-2,14); 
+     sprite(sprite2,-50,-2,45); 
+     sprite(sprite3,23,-2,70);
     glutSwapBuffers(); 
       glFlush();
 } 
@@ -331,19 +378,20 @@ void initialize()
 {    
    glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
-   
+    startscaling = false;
     x = 0; 
     y = 0; 
     Yrotation = 0, Xrotation = 0; 
-
+    velocimaybe = false;
     teleportpickup = false;
 
     floorTex = loadtex("C:/Users/Andrew Alexander/source/repos/opengl stuff 2/opengl stuff 2/painting2.png"); 
     itemTex = loadtex("C:/Users/Andrew Alexander/source/repos/opengl stuff 2/opengl stuff 2/gunTest.png"); 
     ceilingTex= loadtex("C:/Users/Andrew Alexander/source/repos/opengl stuff 2/opengl stuff 2/083.png"); 
     walltex1 = loadtex("C:/Users/Andrew Alexander/source/repos/opengl stuff 2/opengl stuff 2/antikythera.jpg"); 
-    sprite1 = loadtex("C:/Users/Andrew Alexander/source/repos/opengl stuff 2/opengl stuff 2/metalsonicHORIZ.png"); 
-    sprite2 = loadtex("C:/Users/Andrew Alexander/source/repos/opengl stuff 2/opengl stuff 2/xtrememechasonic.png");
+    sprite1 = loadtex("C:/Users/Andrew Alexander/source/repos/opengl stuff 2/opengl stuff 2/metalsonic.png"); 
+    sprite2 = loadtex("C:/Users/Andrew Alexander/source/repos/opengl stuff 2/opengl stuff 2/robot.png"); 
+    sprite3 = loadtex("C:/Users/Andrew Alexander/source/repos/opengl stuff 2/opengl stuff 2/forgotten.png");
 }
  
 void reshape(int w, int h)
@@ -367,19 +415,61 @@ void clockingIN(int)
         physY -= 0.1;
    }  
 
-    if (x > physX - 2 && x<physX + 2 && z>physZ - 2 && z < physZ + 2)
+    if (x > physX - 3 && x<physX + 3 && z>physZ - 3 && z < physZ + 3)
     {
-        physX += cos((Xrotation + 90) * RADIATION)*5;
-        physZ -= sin((Xrotation + 90) * RADIATION)*5; 
-        physangle += 1;
+        physX += cos((Xrotation + 90) * RADIATION)*4;
+        physZ -= sin((Xrotation + 90) * RADIATION)*4; 
+        physangle += 1;  
+        
+        
+    }
+  
+    
+    if (yescollision(x,z,y,-120,-85,-2,1,18,22))
+    {
+        std::cout << "conveying away\n"; 
+        x += cos((Xrotation + 90) * RADIATION);
+        z -= sin((Xrotation + 90) * RADIATION);
+    } 
+
+    if (yescollision(physX, physZ, physY, -120, -85, -2, 1, 18, 22))
+    {
+        std::cout << "conveying away\n";
+        physX += cos((Xrotation + 90) * RADIATION);
+        physZ -= sin((Xrotation + 90) * RADIATION);
     }
    
+
     if (yescollision(physX, physZ, physY, lx - 2, lx + 2, ly - 2, ly + 2, lz - 2, lz + 2))
     {
-        physY += 50;
-        std::cout << "ball incoming\n";
+        physY += 50; 
+        velocimaybe = true;
+        std::cout << "ball incoming\n"; 
+        ballrotation += 20;
+    }  
+    
+    if (startscaling == true)
+    {
+        ballsize += 0.005;
+    } 
+    if (ballsize > 5)
+    {
+        ballsize = 2;
     }
 
+    if(velocimaybe==true) 
+    {  
+        
+        physangle += 2; 
+        ballrotation -= 0.02;
+    }
+
+    if (ballrotation < 0)
+    {
+        velocimaybe = false;
+    }
+           
+        
 }
 
 void TYPE(unsigned char key,int,int)
@@ -449,7 +539,7 @@ int main(int argc,char** argv)
 {     
     std::cout << "Hello World!\n";
     glutInit(&argc,argv);  
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);  
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH|GLUT_STENCIL|GLUT_ALPHA);  
     glutInitWindowSize(1000, 500);
     glutInitWindowPosition(50,50);
     glutCreateWindow("educational window 3D"); 
@@ -463,4 +553,3 @@ int main(int argc,char** argv)
     glutMainLoop(); 
     return 0;
 }
-
